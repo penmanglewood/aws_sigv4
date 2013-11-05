@@ -3,6 +3,7 @@
 #include "aws_params.h"
 #include "aws_status.h"
 #include "bstrlib.h"
+#include "stringy.h"
 
 #define INITIAL_PARAM_COUNT 8
 #define GROW_BY 8
@@ -19,6 +20,7 @@ struct aws_params {
 };
 
 static int expand_array(aws_params_t context);
+static int sort_param(const void *a, const void *b);
 
 aws_params_t aws_params_init()
 {
@@ -63,21 +65,20 @@ int aws_params_add(aws_params_t context, const char *key, const char *value)
     if (status == AWS_ERR)
         return AWS_ERR;
 
-    bkey = bfromcstr(key);
+    bkey = uri_encode(key);
     if (!bkey)
         return AWS_ERR;
 
-    bval = bfromcstr(value);
+    bval = uri_encode(value);
     if (!bval)
         return AWS_ERR;
-
-    /* TODO URI encode bkey */
-    /* TODO URI encode bval */
 
     KeyValue param = {bkey, bval};
 
     context->params[context->size] = param;
     context->size++;
+
+    qsort(context->params, context->size, sizeof(KeyValue), sort_param);
 
     return AWS_OK;
 }
@@ -87,8 +88,6 @@ bstring aws_params_canonicalize(aws_params_t context)
     int i, cmp;
     bstring last_key = bfromcstr("");
     bstring c = bfromcstr("");
-
-    /* TODO sort by key */
 
     for (i = 0; i < context->size; i++) {
         cmp = biseq(context->params[i].key, last_key);
@@ -129,5 +128,8 @@ static int expand_array(aws_params_t context)
 
 static int sort_param(const void *a, const void *b)
 {
-    return ((struct keyvalue *) a)->key->data[0] - ((struct keyvalue *) b)->key->data[0];
+    bstring ka = ((KeyValue *)a)->key;
+    bstring kb = ((KeyValue *)b)->key;
+
+    return bstrcmp(ka, kb);
 }
