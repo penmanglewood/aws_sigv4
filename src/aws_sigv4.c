@@ -77,7 +77,7 @@ aws_t aws_init(const char *host, const char *path, const char *http_method)
     if (!context->path)
         return NULL;
 
-    /* TODO check http_method is allowed? */
+    /* TODO check if http_method is allowed */
     context->request_method = bfromcstr(http_method);
     if (!context->request_method)
         return NULL;

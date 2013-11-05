@@ -3,6 +3,7 @@
 #include "aws_headers.h"
 #include "aws_status.h"
 #include "bstrlib.h"
+#include "stringy.h"
 
 #define INITIAL_HEADER_COUNT 8
 #define GROW_BY 8
@@ -19,6 +20,7 @@ struct aws_headers {
 };
 
 static int expand_array(aws_headers_t context);
+static int sort_header(const void *a, const void *b);
 
 aws_headers_t aws_headers_init()
 {
@@ -31,7 +33,6 @@ aws_headers_t aws_headers_init()
     ctx->headers = malloc(ctx->alloc);
     if (!ctx->headers)
         return NULL;
-
 
     return ctx;
 }
@@ -69,16 +70,17 @@ int aws_headers_add(aws_headers_t context, const char *key, const char *value)
         return AWS_ERR;
     btolower(bkey);
 
+    bval = trimall(value);
     bval = bfromcstr(value);
     if (!bval)
         return AWS_ERR;
-
-    /* TODO trimall from value */
 
     KeyValue header = {bkey, bval};
 
     context->headers[context->size] = header;
     context->size++;
+
+    qsort(context->headers, context->size, sizeof(KeyValue), sort_header);
 
     return AWS_OK;
 }
@@ -88,8 +90,6 @@ bstring aws_headers_canonicalize(aws_headers_t context)
     int i, cmp;
     bstring last_key = bfromcstr("");
     bstring c = bfromcstr("");
-
-    /* TODO sort by key */
 
     for (i = 0; i < context->size; i++) {
         cmp = biseq(context->headers[i].key, last_key);
@@ -121,8 +121,6 @@ bstring aws_headers_sign(aws_headers_t context)
     int i, cmp;
     bstring last_key = bfromcstr("");
     bstring c = bfromcstr("");
-
-    /* TODO sort by key */
 
     for (i = 0; i < context->size; i++) {
         cmp = biseq(context->headers[i].key, last_key);
@@ -160,5 +158,8 @@ static int expand_array(aws_headers_t context)
 
 static int sort_header(const void *a, const void *b)
 {
-    return ((struct keyvalue *) a)->key->data[0] - ((struct keyvalue *) b)->key->data[0];
+    bstring ka = ((KeyValue *)a)->key;
+    bstring kb = ((KeyValue *)b)->key;
+
+    return bstrcmp(ka, kb);
 }
