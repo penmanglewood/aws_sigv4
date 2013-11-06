@@ -1,25 +1,29 @@
-CFLAGS=-g -O2 -Wall -Wextra -Isrc -rdynamic -DNDEBUG $(OPTFLAGS)
+CFLAGS=-O2 -Wall -Wextra -Isrc -rdynamic -DNDEBUG $(OPTFLAGS)
 LIBS=-ldl $(OPTLIBS)
 PREFIX?=/usr/local
 
 SOURCES=$(wildcard src/**/*.c src/*.c)
-HEADERS=$(wildcard src/**/*.h src/*.h)
 OBJECTS=$(patsubst %.c,%.o,$(SOURCES))
 
 TEST_SRC=$(wildcard tests/*_test.c)
 TESTS=$(patsubst %.c,%,$(TEST_SRC))
 
+TARGET=build/libaws_sigv4.a
+SO_TARGET=$(patsubst %.a,%.so,$(TARGET))
+
 # The target build
-all: src/aws_headers.o src/darray.o
-
-src/aws_headers.o: build/darray.o
-	$(CC) -c src/aws_headers.c -o src/aws_headers.o
-
-src/darray.o: src/darray.c src/darray.h
-	$(CC) -c src/darray.c -o src/darray.o
+all: $(TARGET) $(SO_TARGET) tests
 
 dev: CFLAGS=-g -Wall -Isrc -Wall -Wextra $(OPTFLAGS)
 dev: all
+
+$(TARGET): CFLAGS += -fPIC
+$(TARGET): build $(OBJECTS)
+	ar rcs $@ $(OBJECTS)
+	ranlib $@
+
+$(SO_TARGET): $(TARGET) $(OBJECTS)
+	$(CC) -shared -o $@ $(OBJECTS)
 
 build:
 	@mkdir -p build
@@ -27,7 +31,7 @@ build:
 
 # The unit tests
 .PHONY: tests
-tests: CFLAGS
+tests: CFLAGS += $(TARGET)
 tests: $(TESTS)
 	sh ./tests/runtests.sh
 
