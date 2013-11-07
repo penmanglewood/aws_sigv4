@@ -18,7 +18,21 @@
 #ifndef SHA256_H
 #define SHA256_H
 
-/* Hashes string with SHA-256. Stores the hash in outputBuffer. */
-void sha256(char outputbuffer[65], const char *data);
+/**
+ * Hashes string with SHA-256. Stores the hash in outputBuffer.
+ *
+ * return void
+ */
+void sha256(unsigned char out[33], const char *data);
+
+/**
+ * Hashes string with SHA-256 and hex-encodes the output data
+ *
+ * out a character array to write the result to
+ * data the string to hash
+ *
+ * return void
+ */
+void sha256_hex(unsigned char out[65], const char *data);
 
 #endif
