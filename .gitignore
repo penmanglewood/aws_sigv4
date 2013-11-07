@@ -2,3 +2,4 @@ build
 bin
 *.o
 tests/*_test
+tests/*.log
