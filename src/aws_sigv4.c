@@ -24,6 +24,7 @@
 #include "aws_status.h"
 #include "bstrlib.h"
 #include "sha256.h"
+#include "hmac.h"
 
 /* TODO does this belong here? probably not */
 #define GLACIER_API_VERSION_KEY "x-amz-glacier-version"
@@ -52,8 +53,8 @@ static bool initialized = false;
 /* Private functions */
 
 static int generate_canonical_request(aws_t context);
-static int generate_credential_scope(aws_t context, char date[17]);
-static int generate_string_to_sign(aws_t context, char date[17]);
+static int generate_credential_scope(aws_t context, const char date[17]);
+static int generate_string_to_sign(aws_t context, const char date[17]);
 
 aws_t aws_init(const char *region, const char *service, const char *host, const char *path, const char *http_method)
 {
@@ -155,8 +156,9 @@ static int generate_canonical_request(aws_t context)
     bstring signed_headers = aws_headers_sign(context->headers);
     bstring canonical_query_string = aws_params_canonicalize(context->params);
 
-    char hashed_payload[65];
-    sha256(hashed_payload, (const char *)canonical_query_string->data);
+    /* TODO this is for request body. Using empty string for now. */
+    unsigned char hashed_payload[65];
+    sha256_hex(hashed_payload, "");
 
     bconcat(cr, context->request_method);
     bcatcstr(cr, "\n");
@@ -168,7 +170,7 @@ static int generate_canonical_request(aws_t context)
     bcatcstr(cr, "\n");
     bconcat(cr, signed_headers);
     bcatcstr(cr, "\n");
-    bcatcstr(cr, hashed_payload);
+    bcatcstr(cr, (const char *)hashed_payload);
 
     bdestroy(signed_headers);
     bdestroy(canonical_headers);
@@ -179,7 +181,7 @@ static int generate_canonical_request(aws_t context)
     return AWS_OK;
 }
 
-static int generate_credential_scope(aws_t context, char date[17])
+static int generate_credential_scope(aws_t context, const char date[17])
 {
     bstring cs = bfromcstr("");
     char yyyy_mm_dd[9];
@@ -200,10 +202,10 @@ static int generate_credential_scope(aws_t context, char date[17])
     return AWS_OK;
 }
 
-static int generate_string_to_sign(aws_t context, char date[17])
+static int generate_string_to_sign(aws_t context, const char date[17])
 {
     bstring sts = bfromcstr(AWS_SIGNING_ALGORITHM);
-    char hashed_canonical_request[65];
+    unsigned char hashed_canonical_request[65];
 
     bcatcstr(sts, "\n");
     bcatcstr(sts, date);
@@ -214,25 +216,38 @@ static int generate_string_to_sign(aws_t context, char date[17])
     bconcat(sts, context->credential_scope);
     bcatcstr(sts, "\n");
 
-    sha256(hashed_canonical_request, (const char *)context->canonical_request->data);
-    bcatcstr(sts, hashed_canonical_request);
+    sha256_hex(hashed_canonical_request, (const char *)context->canonical_request->data);
+    bcatcstr(sts, (const char *)hashed_canonical_request);
 
     context->string_to_sign = sts;
 
     return AWS_OK;
 }
 
-char *aws_sign(aws_t context, char date[17])
+/* TODO change date to accept any string and parse it with struct tm */
+int aws_sign(aws_t context, const char *secret, const char date[17], char *out)
 {
-    bstring signature;
+    bstring kSecret;
+    char kDate[33], kRegion[33], kService[33], signing_key[33], signature[65];
+    int i;
 
     generate_canonical_request(context);
     generate_string_to_sign(context, date);
 
-    /* DEBUG */
-    /* printf("Canonical Request:\n%s\n", context->canonical_request->data); */
-    /* printf("String to Sign:\n%s\n", context->string_to_sign->data); */
+    kSecret = bfromcstr(AWS_AWS4_STRING);
+    bcatcstr(kSecret, secret);
 
-    /* TODO */
-    return "";
+    hmac(kDate, (const char *)kSecret->data, date);
+    hmac(kRegion, kDate, (const char *)context->region->data);
+    hmac(kService, kRegion, (const char *)context->service->data);
+    hmac(signing_key, kService, AWS_REQUEST_STRING);
+    hmac_hex(signature,  signing_key, (const char *)context->string_to_sign->data);
+
+    bdestroy(kSecret);
+
+    for (i = 0; i < 64; i++)
+        out[i] = signature[i];
+    out[64] = '\0';
+
+    return AWS_OK;
 }

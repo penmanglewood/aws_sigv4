@@ -19,6 +19,7 @@
 
 #define AWS_SIGNING_ALGORITHM "AWS4-HMAC-SHA256"
 #define AWS_REQUEST_STRING "aws4_request"
+#define AWS_AWS4_STRING "AWS4"
 
 typedef struct aws_context *aws_t;
 
@@ -53,8 +54,10 @@ int aws_add_param(aws_t context, const char *key, const char *value);
 /**
  * Generate the signature
  *
- * returns char * with the signature. The return value must be freed.
+ * Writes the signature to user-supplied buffer.
+ *
+ * returns AWS_ERR if failure, AWS_OK otherwise.
  */
-char *aws_sign(aws_t context, char date[17]);
+int aws_sign(aws_t context, const char *secret, const char date[17], char out[65]);
 
 #endif
