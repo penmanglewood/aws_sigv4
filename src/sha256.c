@@ -43,5 +43,5 @@ void sha256(char outputBuffer[65], const char *data)
     for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
         sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
 
-    outputBuffer[64] = 0;
+    outputBuffer[64] = '\0';
 }

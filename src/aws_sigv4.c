@@ -35,24 +35,27 @@ struct aws_context {
     bstring request_method;
     bstring account_id;
     bstring region;
+    bstring service;
     bstring host;
     bstring path;
+    bstring request_date;
+    bstring canonical_request;
+    bstring credential_scope;
+    bstring string_to_sign;
+    bstring signature;
     aws_headers_t headers;
     aws_params_t params;
-    bstring canonical_request;
 };
 
 static bool initialized = false;
 
 /* Private functions */
 
-/* Write the date in ISO 8601 basic format */
-void aws_print_date(char outputBuffer[17]);
-char *aws_canonical_query_string(aws_t context);
-char *aws_canonical_headers(aws_t context);
-char *aws_signed_headers(aws_t context);
+static int generate_canonical_request(aws_t context);
+static int generate_credential_scope(aws_t context, char date[17]);
+static int generate_string_to_sign(aws_t context, char date[17]);
 
-aws_t aws_init(const char *host, const char *path, const char *http_method)
+aws_t aws_init(const char *region, const char *service, const char *host, const char *path, const char *http_method)
 {
     aws_t context = malloc(sizeof(struct aws_context));
     if (context == NULL)
@@ -64,6 +67,14 @@ aws_t aws_init(const char *host, const char *path, const char *http_method)
 
     context->params = aws_params_init();
     if (!context->params)
+        return NULL;
+
+    context->region = bfromcstr(region);
+    if (!context->region)
+        return NULL;
+
+    context->service = bfromcstr(service);
+    if (!context->service)
         return NULL;
 
     context->host = bfromcstr(host);
@@ -83,7 +94,11 @@ aws_t aws_init(const char *host, const char *path, const char *http_method)
         return NULL;
 
     context->account_id = NULL;
-    context->region = NULL;
+    context->request_date = NULL;
+    context->canonical_request = NULL;
+    context->credential_scope = NULL;
+    context->string_to_sign = NULL;
+    context->signature = NULL;
 
     initialized = true;
 
@@ -97,12 +112,18 @@ int aws_cleanup(aws_t context)
 {
     assert(initialized);
 
+    /* TODO need to check if null first? */
     bdestroy(context->account_id);
     bdestroy(context->region);
+    bdestroy(context->service);
+    bdestroy(context->request_date);
     bdestroy(context->host);
     bdestroy(context->path);
     bdestroy(context->request_method);
     bdestroy(context->canonical_request);
+    bdestroy(context->credential_scope);
+    bdestroy(context->string_to_sign);
+    bdestroy(context->signature);
 
     aws_headers_destroy(context->headers);
     aws_params_destroy(context->params);
@@ -127,7 +148,7 @@ int aws_add_param(aws_t context, const char *key, const char *value)
     return aws_params_add(context->params, key, value);
 }
 
-void generate_canonical_request(aws_t context)
+static int generate_canonical_request(aws_t context)
 {
     bstring cr = bfromcstr("");
     bstring canonical_headers = aws_headers_canonicalize(context->headers);
@@ -135,7 +156,6 @@ void generate_canonical_request(aws_t context)
     bstring canonical_query_string = aws_params_canonicalize(context->params);
 
     char hashed_payload[65];
-    printf("query string is [%s]\n", canonical_query_string->data);
     sha256(hashed_payload, (const char *)canonical_query_string->data);
 
     bconcat(cr, context->request_method);
@@ -156,6 +176,63 @@ void generate_canonical_request(aws_t context)
 
     context->canonical_request = cr;
 
+    return AWS_OK;
+}
+
+static int generate_credential_scope(aws_t context, char date[17])
+{
+    bstring cs = bfromcstr("");
+    char yyyy_mm_dd[9];
+
+    strncpy(yyyy_mm_dd, date, 8);
+    yyyy_mm_dd[8] = '\0';
+
+    bcatcstr(cs, yyyy_mm_dd);
+    bconchar(cs, '/');
+    bconcat(cs, context->region);
+    bconchar(cs, '/');
+    bconcat(cs, context->service);
+    bconchar(cs, '/');
+    bcatcstr(cs, AWS_REQUEST_STRING);
+
+    context->credential_scope = cs;
+
+    return AWS_OK;
+}
+
+static int generate_string_to_sign(aws_t context, char date[17])
+{
+    bstring sts = bfromcstr(AWS_SIGNING_ALGORITHM);
+    char hashed_canonical_request[65];
+
+    bcatcstr(sts, "\n");
+    bcatcstr(sts, date);
+    bcatcstr(sts, "\n");
+
+    generate_credential_scope(context, date);
+
+    bconcat(sts, context->credential_scope);
+    bcatcstr(sts, "\n");
+
+    sha256(hashed_canonical_request, (const char *)context->canonical_request->data);
+    bcatcstr(sts, hashed_canonical_request);
+
+    context->string_to_sign = sts;
+
+    return AWS_OK;
+}
+
+char *aws_sign(aws_t context, char date[17])
+{
+    bstring signature;
+
+    generate_canonical_request(context);
+    generate_string_to_sign(context, date);
+
     /* DEBUG */
-    printf("Canonical Request:\n%s", context->canonical_request->data);
+    /* printf("Canonical Request:\n%s\n", context->canonical_request->data); */
+    /* printf("String to Sign:\n%s\n", context->string_to_sign->data); */
+
+    /* TODO */
+    return "";
 }
