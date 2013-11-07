@@ -69,8 +69,30 @@ char *test_add_headers()
 char *test_sign()
 {
     char date[17] = "20131106T090900Z";
+    char signature[65];
+    int status;
 
-    aws_sign(context, date);
+    status = aws_sign(context, "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY", date, signature);
+    mu_assert(status == AWS_OK, "aws_sign failed");
+
+    return NULL;
+}
+
+char *test_example()
+{
+    char date[17] = "20110909T233600Z";
+    char *secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+    char signature[65];
+
+    aws_cleanup(context);
+    context = aws_init("us-east-1", "host", "host.foo.com", "/", "GET");
+
+    aws_add_param(context, "foo", "Zoo");
+    aws_add_param(context, "foo", "aha");
+
+    aws_sign(context, secret, date, signature);
+
+    mu_assert(strcmp(signature, "be7148d34ebccdc6423b19085378aa0bee970bdc61d144bd1a8c48c33079ab09") == 0, "Signatures don't match");
 
     return NULL;
 }
@@ -91,6 +113,7 @@ char *all_tests() {
     mu_run_test(test_add_bad_params);
     mu_run_test(test_add_params);
     mu_run_test(test_sign);
+    mu_run_test(test_example);
     mu_run_test(test_cleanup);
 
     return NULL;
