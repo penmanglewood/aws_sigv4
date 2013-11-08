@@ -17,15 +17,17 @@
 #ifndef HMAC256_H
 #define HMAC256_H
 
+#define HMAC_DIGEST_LENGTH 32
+
 /**
  * Hashes string with HMAC-256. Stores the hash in outputBuffer.
  */
-void hmac(char out[33], const char *key, const char *data);
+void hmac(unsigned char out[32], const unsigned char *key, size_t key_len, const unsigned char *data, size_t data_len);
 
 /**
  * Hashes string with HMAC-256 and hex-encodes output.
  * Stores the hash in outputBuffer.
  */
-void hmac_hex(char out[65], const char *key, const char *data);
+void hmac_hex(char out[65], const unsigned char *key, size_t key_len, const unsigned char *data, size_t data_len);
 
 #endif

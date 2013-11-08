@@ -26,25 +26,21 @@
 #include <openssl/sha.h>
 #endif
 
-void sha256(char out[33], const char *data)
+void sha256(unsigned char out[32], const char *data)
 {
-    int i;
-
 #if defined(__APPLE__)
     CC_SHA256(data, strlen(data), (unsigned char *)out);
 #else
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, data, strlen(data));
-    SHA256_Final(out, &sha256);
+    SHA256_CTX sha;
+    SHA256_Init(&sha);
+    SHA256_Update(&sha, data, strlen(data));
+    SHA256_Final(out, &sha);
 #endif
-
-    out[32] = '\0';
 }
 
 void sha256_hex(char out[65], const char *data)
 {
-    char hash[SHA256_DIGEST_LENGTH + 1];
+    unsigned char hash[SHA256_DIGEST_LENGTH];
     int i;
 
     sha256(hash, data);

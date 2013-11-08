@@ -23,7 +23,7 @@
  *
  * return void
  */
-void sha256(unsigned char out[33], const char *data);
+void sha256(unsigned char out[32], const char *data);
 
 /**
  * Hashes string with SHA-256 and hex-encodes the output data
@@ -33,6 +33,6 @@ void sha256(unsigned char out[33], const char *data);
  *
  * return void
  */
-void sha256_hex(unsigned char out[65], const char *data);
+void sha256_hex(char out[65], const char *data);
 
 #endif
