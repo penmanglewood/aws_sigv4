@@ -68,7 +68,7 @@ char *test_add_headers()
 
 char *test_sign()
 {
-    char date[17] = "20131106T090900Z";
+    char *date = "Mon, 09 Sep 2011 23:36:00 GMT";
     char signature[65];
     int status;
 
@@ -80,19 +80,16 @@ char *test_sign()
 
 char *test_example()
 {
-    char date[17] = "20110909T233600Z";
+    char *date = "Mon, 09 Sep 2011 23:36:00 GMT";
     char *secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
     char signature[65];
 
     aws_cleanup(context);
     context = aws_init("us-east-1", "host", "host.foo.com", "/", "GET");
 
-    aws_add_param(context, "foo", "Zoo");
-    aws_add_param(context, "foo", "aha");
-
     aws_sign(context, secret, date, signature);
 
-    mu_assert(strcmp(signature, "be7148d34ebccdc6423b19085378aa0bee970bdc61d144bd1a8c48c33079ab09") == 0, "Signatures don't match");
+    mu_assert(strcmp(signature, "b27ccfbfa7df52a200ff74193ca6e32d4b48b8856fab7ebf1c595d0670a7e470") == 0, "Signatures don't match");
 
     return NULL;
 }

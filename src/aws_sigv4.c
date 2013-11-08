@@ -14,7 +14,6 @@
  * =====================================================================================
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
@@ -254,10 +253,6 @@ int aws_sign(aws_t context, const char *secret, const char *date, char *out)
     hmac(kRegion, kDate, HMAC_DIGEST_LENGTH, context->region->data, strlen((char *)context->region->data));
     hmac(kService, kRegion, HMAC_DIGEST_LENGTH, context->service->data, strlen((char *)context->service->data));
     hmac(signing_key, kService, HMAC_DIGEST_LENGTH, (unsigned char *)AWS_REQUEST_STRING, strlen(AWS_REQUEST_STRING));
-
-    for (i = 0; i < 32; i++)
-        printf("%d=>[%d] ", i, signing_key[i]);
-    printf("\n");
 
     hmac_hex(signature,  signing_key, HMAC_DIGEST_LENGTH, context->string_to_sign->data, strlen((char *)context->string_to_sign->data));
 

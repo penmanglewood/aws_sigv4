@@ -28,7 +28,7 @@ char *test_canonicalize()
     bstring c, expected;
 
     c = aws_headers_canonicalize(headers);
-    expected = bfromcstr("key1:val1\nkey2:val2\nkey3:val3");
+    expected = bfromcstr("key1:val1\nkey2:val2\nkey3:val3\n");
 
     mu_assert(biseq(c, expected) == 1, "Wrong canonical string");
 
@@ -52,7 +52,7 @@ char *test_adding_out_of_order()
     aws_headers_add(headers, "key1", "val1");
 
     c = aws_headers_canonicalize(headers);
-    expected = bfromcstr("key1:val1\nkey2:val2\nkey3:val3\nkey4:val4");
+    expected = bfromcstr("key1:val1\nkey2:val2\nkey3:val3\nkey4:val4\n");
 
     mu_assert(biseq(c, expected) == 1, "Canonical string out of order");
 
