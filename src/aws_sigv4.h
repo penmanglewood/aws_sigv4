@@ -20,6 +20,7 @@
 #define AWS_SIGNING_ALGORITHM "AWS4-HMAC-SHA256"
 #define AWS_REQUEST_STRING "aws4_request"
 #define AWS_AWS4_STRING "AWS4"
+#define AWS_DATE_FORMAT "%a, %d %b %Y %H:%M:%S GMT"
 
 typedef struct aws_context *aws_t;
 
@@ -56,8 +57,10 @@ int aws_add_param(aws_t context, const char *key, const char *value);
  *
  * Writes the signature to user-supplied buffer.
  *
+ * date The Date header value from the request. Must be in RFC-2616 format.
+ *
  * returns AWS_ERR if failure, AWS_OK otherwise.
  */
-int aws_sign(aws_t context, const char *secret, const char date[17], char out[65]);
+int aws_sign(aws_t context, const char *secret, const char *date, char out[65]);
 
 #endif

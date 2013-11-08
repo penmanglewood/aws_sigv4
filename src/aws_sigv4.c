@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include <assert.h>
 #include "aws_sigv4.h"
 #include "aws_headers.h"
@@ -32,6 +33,13 @@
 
 static char *http_request_methods[4] = {"GET", "POST", "PUT", "DELETE"};
 
+struct request_date {
+    bstring original_str;
+    bstring str; /* YYYY-MM-DDTHH:MM:SSZ */
+    bstring str_date_only; /* YYYY-MM-DD */
+    struct tm tm;
+};
+
 struct aws_context {
     bstring request_method;
     bstring account_id;
@@ -39,7 +47,7 @@ struct aws_context {
     bstring service;
     bstring host;
     bstring path;
-    bstring request_date;
+    struct request_date date;
     bstring canonical_request;
     bstring credential_scope;
     bstring string_to_sign;
@@ -53,8 +61,9 @@ static bool initialized = false;
 /* Private functions */
 
 static int generate_canonical_request(aws_t context);
-static int generate_credential_scope(aws_t context, const char date[17]);
-static int generate_string_to_sign(aws_t context, const char date[17]);
+static int generate_credential_scope(aws_t context);
+static int generate_string_to_sign(aws_t context);
+static int parse_date(aws_t context, const char *str);
 
 aws_t aws_init(const char *region, const char *service, const char *host, const char *path, const char *http_method)
 {
@@ -94,8 +103,11 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
     if (!context->request_method)
         return NULL;
 
+    context->date.original_str = NULL;
+    context->date.str = NULL;
+    context->date.str_date_only = NULL;
+
     context->account_id = NULL;
-    context->request_date = NULL;
     context->canonical_request = NULL;
     context->credential_scope = NULL;
     context->string_to_sign = NULL;
@@ -117,7 +129,6 @@ int aws_cleanup(aws_t context)
     bdestroy(context->account_id);
     bdestroy(context->region);
     bdestroy(context->service);
-    bdestroy(context->request_date);
     bdestroy(context->host);
     bdestroy(context->path);
     bdestroy(context->request_method);
@@ -125,6 +136,9 @@ int aws_cleanup(aws_t context)
     bdestroy(context->credential_scope);
     bdestroy(context->string_to_sign);
     bdestroy(context->signature);
+    bdestroy(context->date.original_str);
+    bdestroy(context->date.str);
+    bdestroy(context->date.str_date_only);
 
     aws_headers_destroy(context->headers);
     aws_params_destroy(context->params);
@@ -157,7 +171,7 @@ static int generate_canonical_request(aws_t context)
     bstring canonical_query_string = aws_params_canonicalize(context->params);
 
     /* TODO this is for request body. Using empty string for now. */
-    unsigned char hashed_payload[65];
+    char hashed_payload[65];
     sha256_hex(hashed_payload, "");
 
     bconcat(cr, context->request_method);
@@ -181,15 +195,11 @@ static int generate_canonical_request(aws_t context)
     return AWS_OK;
 }
 
-static int generate_credential_scope(aws_t context, const char date[17])
+static int generate_credential_scope(aws_t context)
 {
     bstring cs = bfromcstr("");
-    char yyyy_mm_dd[9];
 
-    strncpy(yyyy_mm_dd, date, 8);
-    yyyy_mm_dd[8] = '\0';
-
-    bcatcstr(cs, yyyy_mm_dd);
+    bconcat(cs, context->date.str_date_only);
     bconchar(cs, '/');
     bconcat(cs, context->region);
     bconchar(cs, '/');
@@ -202,16 +212,16 @@ static int generate_credential_scope(aws_t context, const char date[17])
     return AWS_OK;
 }
 
-static int generate_string_to_sign(aws_t context, const char date[17])
+static int generate_string_to_sign(aws_t context)
 {
     bstring sts = bfromcstr(AWS_SIGNING_ALGORITHM);
-    unsigned char hashed_canonical_request[65];
+    char hashed_canonical_request[65];
 
     bcatcstr(sts, "\n");
-    bcatcstr(sts, date);
+    bconcat(sts, context->date.str);
     bcatcstr(sts, "\n");
 
-    generate_credential_scope(context, date);
+    generate_credential_scope(context);
 
     bconcat(sts, context->credential_scope);
     bcatcstr(sts, "\n");
@@ -224,30 +234,62 @@ static int generate_string_to_sign(aws_t context, const char date[17])
     return AWS_OK;
 }
 
-/* TODO change date to accept any string and parse it with struct tm */
-int aws_sign(aws_t context, const char *secret, const char date[17], char *out)
+int aws_sign(aws_t context, const char *secret, const char *date, char *out)
 {
     bstring kSecret;
-    char kDate[33], kRegion[33], kService[33], signing_key[33], signature[65];
+    unsigned char kDate[32], kRegion[32], kService[32], signing_key[32];
+    char signature[65];
     int i;
 
+    if (parse_date(context, date) != AWS_OK)
+        return AWS_ERR;
+
     generate_canonical_request(context);
-    generate_string_to_sign(context, date);
+    generate_string_to_sign(context);
 
     kSecret = bfromcstr(AWS_AWS4_STRING);
     bcatcstr(kSecret, secret);
 
-    hmac(kDate, (const char *)kSecret->data, date);
-    hmac(kRegion, kDate, (const char *)context->region->data);
-    hmac(kService, kRegion, (const char *)context->service->data);
-    hmac(signing_key, kService, AWS_REQUEST_STRING);
-    hmac_hex(signature,  signing_key, (const char *)context->string_to_sign->data);
+    hmac(kDate, kSecret->data, strlen((char *)kSecret->data), context->date.str_date_only->data, strlen((char *)context->date.str_date_only->data));
+    hmac(kRegion, kDate, HMAC_DIGEST_LENGTH, context->region->data, strlen((char *)context->region->data));
+    hmac(kService, kRegion, HMAC_DIGEST_LENGTH, context->service->data, strlen((char *)context->service->data));
+    hmac(signing_key, kService, HMAC_DIGEST_LENGTH, (unsigned char *)AWS_REQUEST_STRING, strlen(AWS_REQUEST_STRING));
+
+    for (i = 0; i < 32; i++)
+        printf("%d=>[%d] ", i, signing_key[i]);
+    printf("\n");
+
+    hmac_hex(signature,  signing_key, HMAC_DIGEST_LENGTH, context->string_to_sign->data, strlen((char *)context->string_to_sign->data));
 
     bdestroy(kSecret);
 
     for (i = 0; i < 64; i++)
         out[i] = signature[i];
     out[64] = '\0';
+
+    return AWS_OK;
+}
+
+static int parse_date(aws_t context, const char *str)
+{
+    char yyyy_mm_dd_hh_mm_ss[17],
+         yyyy_mm_dd[9];
+
+    if (strptime(str, AWS_DATE_FORMAT, &context->date.tm) == NULL)
+        return AWS_ERR;
+
+    if (strftime(yyyy_mm_dd_hh_mm_ss, 17, "%Y%m%dT%H%M%SZ", &context->date.tm) == 0)
+        return AWS_ERR;
+
+    if (strftime(yyyy_mm_dd, 9, "%Y%m%d", &context->date.tm) == 0)
+        return AWS_ERR;
+
+    context->date.original_str = bfromcstr(str);
+    context->date.str = bfromcstr(yyyy_mm_dd_hh_mm_ss);
+    context->date.str_date_only = bfromcstr(yyyy_mm_dd);
+
+    if (aws_add_header(context, "date", str) != AWS_OK)
+        return AWS_ERR;
 
     return AWS_OK;
 }
