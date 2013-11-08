@@ -111,6 +111,9 @@ bstring aws_headers_canonicalize(aws_headers_t context)
         last_key = bstrcpy(context->headers[i].key);
     }
 
+    if (cmp != -1)
+        bcatcstr(c, "\n");
+
     bdestroy(last_key);
 
     return c;
