@@ -26,10 +26,6 @@
 #include "sha256.h"
 #include "hmac.h"
 
-/* TODO does this belong here? probably not */
-#define GLACIER_API_VERSION_KEY "x-amz-glacier-version"
-#define GLACIER_API_VERSION_VALUE "x-amz-glacier-version"
-
 static char *http_request_methods[4] = {"GET", "POST", "PUT", "DELETE"};
 
 struct request_date {
