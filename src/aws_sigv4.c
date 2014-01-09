@@ -25,6 +25,7 @@
 #include "bstrlib.h"
 #include "sha256.h"
 #include "hmac.h"
+#include "uri.h"
 
 static char *http_request_methods[4] = {"GET", "POST", "PUT", "DELETE"};
 
@@ -88,8 +89,7 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
 
     aws_headers_add(context->headers, "host", host);
 
-    /* TODO create canonical URI */
-    context->path = bfromcstr(path);
+    context->path = uri_normalize(path);
     if (!context->path)
         return NULL;
 

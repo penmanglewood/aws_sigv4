@@ -29,6 +29,19 @@ char *test_url()
     return NULL;
 }
 
+char *test_nonpath()
+{
+    char *test_str = "nonpath";
+    bstring expected = bfromcstr(test_str);
+    bstring res;
+
+    res = uri_normalize(test_str);
+
+    mu_assert(biseq(expected, res) == 1, "nonpath should be normalized to nonpath");
+
+    return NULL;
+}
+
 char *test_relative_path()
 {
     char *test_str = "http://google.com/a/fds/../b/erw/../c/";
@@ -47,6 +60,7 @@ char *all_tests() {
 
     mu_run_test(test_empty_string);
     mu_run_test(test_url);
+    mu_run_test(test_nonpath);
     mu_run_test(test_relative_path);
 
     return NULL;
