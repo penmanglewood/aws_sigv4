@@ -1,5 +1,5 @@
-CFLAGS=-O2 -Wall -Wextra -Isrc -rdynamic -DNDEBUG $(OPTFLAGS)
-LIBS=-ldl $(OPTLIBS)
+CFLAGS=-O2 -Wall -Wextra -Isrc -rdynamic -DNDEBUG $(shell pkg-config --cflags liburiparser) $(OPTFLAGS)
+LIBS=$(shell pkg-config --libs liburiparser) $(OPTLIBS)
 PREFIX?=/usr/local
 
 SOURCES=$(wildcard src/**/*.c src/*.c)
@@ -23,7 +23,7 @@ $(TARGET): build $(OBJECTS)
 	ranlib $@
 
 $(SO_TARGET): $(TARGET) $(OBJECTS)
-	$(CC) -shared -o $@ $(OBJECTS)
+	$(CC) -shared -o $@ $(OBJECTS) $(LIBS)
 
 build:
 	@mkdir -p build
@@ -31,7 +31,7 @@ build:
 
 # The unit tests
 .PHONY: tests
-tests: CFLAGS += $(TARGET)
+tests: CFLAGS += $(TARGET) $(LIBS)
 tests: $(TESTS)
 	sh ./tests/runtests.sh
 
