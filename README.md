@@ -26,8 +26,7 @@ In your code include the library:
 
 Then link the library when you compile:
 
-    gcc -o yourprogram yourprogram.c -L/path/to/libaws_sigv4.a -laws_sigv4
--luriparser -I/path/to/aws_sigv4/src
+    gcc -o yourprogram yourprogram.c -L/path/to/libaws_sigv4.a -laws_sigv4 -luriparser -I/path/to/aws_sigv4/src
 
 # Licenses
 
