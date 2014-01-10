@@ -3,6 +3,17 @@
 aws_sigv4 is a small C library for creating an Amazon Web Services signature
 version 4.
 
+## Pardon our dust
+
+This library is still in pre-release Alpha state. It does not use the GNU build
+tools yet and has only been compiled on Mac OS X. For now it is assumed that
+liburiparser is installed on your system.
+
+Furthermore, the API might change between now and the beta. Non-GET requests may
+be signed incorrectly now.
+
+Be warned.
+
 # Licenses
 
 ## aws_sigv4
