@@ -14,6 +14,21 @@ be signed incorrectly now.
 
 Be warned.
 
+## Usage
+
+For now, ```make``` or ```make dev``` is enough.
+
+The library will be saved in ./build.
+
+In your code include the library:
+
+    #include <aws_sigv4.h>
+
+Then link the library when you compile:
+
+    gcc -o yourprogram yourprogram.c -L/path/to/libaws_sigv4.a -laws_sigv4
+-luriparser -I/path/to/aws_sigv4/src
+
 # Licenses
 
 ## aws_sigv4
