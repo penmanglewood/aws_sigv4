@@ -20,7 +20,9 @@ struct aws_params {
 };
 
 static int expand_array(aws_params_t context);
-static int sort_param(const void *a, const void *b);
+static void kvsort(aws_params_t context);
+static int cmp_keys(const void *a, const void *b);
+static int cmp_values(const void *a, const void *b);
 
 aws_params_t aws_params_init()
 {
@@ -78,35 +80,24 @@ int aws_params_add(aws_params_t context, const char *key, const char *value)
     context->params[context->size] = param;
     context->size++;
 
-    qsort(context->params, context->size, sizeof(KeyValue), sort_param);
-
     return AWS_OK;
 }
 
 bstring aws_params_canonicalize(aws_params_t context)
 {
-    int i, cmp;
-    bstring last_key = bfromcstr("");
+    int i;
     bstring c = bfromcstr("");
 
+    kvsort(context);
+
     for (i = 0; i < context->size; i++) {
-        cmp = biseq(context->params[i].key, last_key);
-        if (cmp == 0) {
-            bconcat(c, context->params[i].key);
-            bconchar(c, '=');
-            bconcat(c, context->params[i].value);
+        bconcat(c, context->params[i].key);
+        bconchar(c, '=');
+        bconcat(c, context->params[i].value);
 
-            if (i < context->size - 1)
-                bconchar(c, '&');
-        } else if (cmp == -1) {
-            break;
-        }
-
-        bdestroy(last_key);
-        last_key = bstrcpy(context->params[i].key);
+        if (i < context->size - 1)
+            bconchar(c, '&');
     }
-
-    bdestroy(last_key);
 
     return c;
 }
@@ -126,10 +117,41 @@ static int expand_array(aws_params_t context)
     return AWS_OK;
 }
 
-static int sort_param(const void *a, const void *b)
+static int cmp_keys(const void *a, const void *b)
 {
     bstring ka = ((KeyValue *)a)->key;
     bstring kb = ((KeyValue *)b)->key;
 
     return bstrcmp(ka, kb);
+}
+
+static int cmp_values(const void *a, const void *b)
+{
+    bstring ka = ((KeyValue *)a)->value;
+    bstring kb = ((KeyValue *)b)->value;
+
+    return bstrcmp(ka, kb);
+}
+
+static void kvsort(aws_params_t context)
+{
+    int i, j, key_changed = 0;
+    KeyValue current_kv;
+    KeyValue tmp;
+
+    // Sort keys
+    qsort(context->params, context->size, sizeof(KeyValue), cmp_keys);
+
+    for (i = 0; i < context->size; i++) {
+        current_kv = context->params[i];
+        j = i + 1;
+        while (j < context->size && bstrcmp(current_kv.key, context->params[j].key) == 0) {
+            if (cmp_values(&context->params[i], &context->params[j]) > 0) {
+                tmp = context->params[i];
+                context->params[i] = context->params[j];
+                context->params[j] = tmp;
+            }
+            j++;
+        }
+    }
 }

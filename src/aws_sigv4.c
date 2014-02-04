@@ -261,6 +261,38 @@ int aws_sign(aws_t context, const char *secret, const char *date, char *out)
     return AWS_OK;
 }
 
+void aws_debug(aws_t context, char *out)
+{
+    bstring b = bfromcstr("");
+
+    if (context->request_method) {
+        bconcat(b, context->request_method);
+        bcatcstr(b, "\n");
+    }
+
+    if (context->path) {
+        bconcat(b, context->path);
+        bcatcstr(b, "\n");
+    }
+
+    if (context->canonical_request) {
+        bconcat(b, context->canonical_request);
+        /* bcatcstr(b, "\n"); */
+    }
+
+    /* if (context->string_to_sign) { */
+    /*     bconcat(b, context->string_to_sign); */
+    /*     bcatcstr(b, "\n"); */
+    /* } */
+
+    /* if (context->signature) { */
+    /*     bconcat(b, context->signature); */
+    /*     bcatcstr(b, "\n"); */
+    /* } */
+
+    strcpy(out, bdata(b));
+}
+
 static int parse_date(aws_t context, const char *str)
 {
     char yyyy_mm_dd_hh_mm_ss[17],

@@ -63,4 +63,9 @@ int aws_add_param(aws_t context, const char *key, const char *value);
  */
 int aws_sign(aws_t context, const char *secret, const char *date, char out[65]);
 
+/**
+ * Generate debug string and swrite it to caller-supplied variable
+ */
+void aws_debug(aws_t context, char *out);
+
 #endif
