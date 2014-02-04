@@ -15,6 +15,11 @@ struct file {
     FILE *req_file;
 };
 
+struct pair {
+    char *key;
+    char *val;
+};
+
 void cleanup_files(struct file *file);
 int prepare_files(char *raw_filename, struct file *file);
 
@@ -32,14 +37,17 @@ char *test_aws_testsuite()
     char calculated_signature[65];
     char correct_signature[65];
     char *path;
+    char pathonly[255];
+    char *question_mark_pos;
     char *method;
     char *param_str = NULL;
     char *kv_pair = NULL;
     char *kv_str;
     char *kvtok_str;
     char pair_tok[255];
-    char *q_key;
-    char *q_val;
+    struct pair kv;
+
+    char out[1024];
 
     aws_t context;
 
@@ -73,36 +81,43 @@ char *test_aws_testsuite()
                 path = strtok(NULL, "\n");
                 path[strlen(path) - 10] = '\0';
 
+                // Cut path at the "?" if it has params
+                strcpy(pathonly, path);
+                question_mark_pos = strstr(path, "?");
+                if (question_mark_pos != NULL)
+                    pathonly[question_mark_pos-path] = '\0';
+
                 // DEBUG only test GET for now
                 if (strcmp(method, "GET") != 0) {
                     cleanup_files(&file);
                     continue;
                 }
 
-                context = aws_init("us-east-1", "host", "host.foo.com", path, method);
+                context = aws_init("us-east-1", "host", "host.foo.com", pathonly, method);
 
                 param_str = strstr(path, "?");
                 if (param_str != NULL) {
                     param_str++; /* Skip "?" */
                     for (kv_pair = strtok_r(param_str, "&", &kv_str); kv_pair; kv_pair = strtok_r(NULL, "&", &kv_str)) {
                         strcpy(pair_tok, kv_pair);
-                        q_key = strtok_r(pair_tok, "=", &kvtok_str);
-                        q_val = strtok_r(NULL, "\n", &kvtok_str);
+                        kv.key = strtok_r(pair_tok, "=", &kvtok_str);
+                        kv.val = strtok_r(NULL, "\n", &kvtok_str);
 
-                        aws_add_param(context, q_key, q_val);
+                        aws_add_param(context, kv.key, kv.val);
                     }
                 }
-
-                // TODO get headers
 
                 aws_sign(context, secret, date, calculated_signature);
 
                 // DEBUG
-                printf("%s %s\n%s vs\n%s\n\n", path, file.req_name, calculated_signature, correct_signature);
+                /* aws_debug(context, out); */
+                /* printf("%s %s\n%s vs\n%s\n\n", path, file.req_name, calculated_signature, correct_signature); */
+                /* printf("-->\n%s\n<--\n", out); */
 
-                /* mu_assert(strcmp(calculated_signature, correct_signature) == 0, "Signatures don't match"); */
+                mu_assert(strcmp(calculated_signature, correct_signature) == 0, "Signatures don't match");
 
                 cleanup_files(&file);
+                aws_cleanup(context);
             }
         }
 

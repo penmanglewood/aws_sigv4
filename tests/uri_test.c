@@ -120,6 +120,19 @@ char *test_consecutive_slashes_4()
     return NULL;
 }
 
+char *test_one_slash()
+{
+    char *test_str = "/";
+    bstring expected = bfromcstr(test_str);
+    bstring res;
+
+    res = uri_normalize(test_str);
+
+    mu_assert(biseq(expected, res) == 1, "One slash should stay the same");
+
+    return NULL;
+}
+
 char *all_tests() {
     mu_suite_start();
 
@@ -132,6 +145,7 @@ char *all_tests() {
     mu_run_test(test_consecutive_slashes_2);
     mu_run_test(test_consecutive_slashes_3);
     mu_run_test(test_consecutive_slashes_4);
+    mu_run_test(test_one_slash);
 
     return NULL;
 }
