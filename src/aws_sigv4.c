@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <time.h>
 #include <assert.h>
 #include "aws_sigv4.h"
@@ -26,6 +27,7 @@
 #include "sha256.h"
 #include "hmac.h"
 #include "uri.h"
+#include "utils.h"
 
 static char *http_request_methods[4] = {"GET", "POST", "PUT", "DELETE"};
 
@@ -60,6 +62,8 @@ static int generate_canonical_request(aws_t context);
 static int generate_credential_scope(aws_t context);
 static int generate_string_to_sign(aws_t context);
 static int parse_date(aws_t context, const char *str);
+static void parse_path(aws_t context, const char *the_path, int len);
+static void parse_query_parameters(aws_t context, const char *the_path, int len);
 
 aws_t aws_init(const char *region, const char *service, const char *host, const char *path, const char *http_method)
 {
@@ -89,7 +93,7 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
 
     aws_headers_add(context->headers, "host", host);
 
-    context->path = uri_normalize(path);
+    parse_path(context, path, strlen(path));
     if (!context->path)
         return NULL;
 
@@ -110,15 +114,14 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
 
     initialized = true;
 
-    /* TODO glacier api version key and version value need to be added as header.
-     * This can be done from the outside */
-
     return context;
 }
 
 int aws_cleanup(aws_t context)
 {
+#ifdef DEBUG
     assert(initialized);
+#endif
 
     /* TODO need to check if null first? */
     bdestroy(context->account_id);
@@ -148,13 +151,19 @@ int aws_cleanup(aws_t context)
 
 int aws_add_header(aws_t context, const char *key, const char *value)
 {
+#ifdef DEBUG
     assert(initialized);
+#endif
+
     return aws_headers_add(context->headers, key, value);
 }
 
 int aws_add_param(aws_t context, const char *key, const char *value)
 {
+#ifdef DEBUG
     assert(initialized);
+#endif
+
     return aws_params_add(context->params, key, value);
 }
 
@@ -315,4 +324,52 @@ static int parse_date(aws_t context, const char *str)
         return AWS_ERR;
 
     return AWS_OK;
+}
+
+/**
+ * Parse only the path portion of a string
+ * It includes everything up until the "?" start of the query string
+ */
+static void parse_path(aws_t context, const char *the_path, int len)
+{
+    char *strpos, *path;
+
+    path = malloc(sizeof(char) * len);
+    if (!path)
+        return;
+    strncpy(path, the_path, len);
+
+    strpos = strstr(the_path, "?");
+    if (strpos != NULL)
+        path[strpos-the_path] = '\0';
+    else
+        path[len] = '\0';
+
+    context->path = uri_normalize(path);
+    free(path);
+}
+
+/**
+ * Parse the query parameters from a given string and save them in aws_params_t
+ */
+static void parse_query_parameters(aws_t context, const char *the_path, int len)
+{
+    char *path, *paramscope, *kvscope, *param;
+    int strpos;
+    Pair kv;
+
+    path = malloc(sizeof(char) * len);
+    if (!path)
+        return;
+    strncpy(path, the_path, len);
+
+    strtok_r(path, "?&", &paramscope);
+    while ((param = strtok_r(NULL, "?&", &paramscope))) {
+        kv.key = strtok_r(param, "=", &kvscope);
+        kv.value = strtok_r(NULL, "=", &kvscope);
+
+        aws_params_add(context->params, kv.key, kv.value);
+    }
+
+    free(path);
 }
