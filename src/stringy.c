@@ -7,9 +7,9 @@
 
 #define HEX_CHAR_LEN 3 /* Percent sign plus two characters */
 
-static char hextoint(char c);
-static char inttohex(char c);
-static void printhex(char *dest, char src);
+/* static char hextoint(const char c); */
+static char inttohex(const char c);
+static void printhex(char *dest, const char src);
 
 bstring trimall(const char *str)
 {
@@ -94,11 +94,16 @@ bstring uri_encode(const char *str)
     bstring encoded;
 
     oldStrBuf = (char *)str;
-    while(*oldStrBuf++)
+    while(*oldStrBuf) {
         if (*oldStrBuf != '\0' &&
             !isalnum(*oldStrBuf) &&
-            *oldStrBuf != '-' && *oldStrBuf != '_' && *oldStrBuf != '.' && *oldStrBuf != '~')
+            *oldStrBuf != '-' && *oldStrBuf != '_' &&
+            *oldStrBuf != '.' && *oldStrBuf != '~') {
             encodableCharacters++;
+        }
+
+        oldStrBuf++;
+    }
 
     newStrLen = (strlen(str) - encodableCharacters) +
         (encodableCharacters * HEX_CHAR_LEN) +
@@ -130,20 +135,20 @@ bstring uri_encode(const char *str)
 }
 
 /* Writes the hexadecimal 2-character byte to dest as a string */
-static void printhex(char *dest, char src)
+static void printhex(char *dest, const char src)
 {
     *dest = inttohex(src >> 4);
     *(dest + 1) = inttohex(src & 15);
 }
 
 /* Convert hex character to its integer value */
-static char hextoint(char c)
-{
-    return isdigit(c) ? c - '0' : tolower(c) - 'a' + 10;
-}
+/* static char hextoint(const char c) */
+/* { */
+/*     return isdigit(c) ? c - '0' : tolower(c) - 'a' + 10; */
+/* } */
 
 /* Convert integer to its hex value */
-static char inttohex(char c)
+static char inttohex(const char c)
 {
     static char hex[] = "0123456789ABCDEF";
     return hex[c & 15];

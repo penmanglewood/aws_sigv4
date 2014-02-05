@@ -78,6 +78,7 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
     context->params = aws_params_init();
     if (!context->params)
         return NULL;
+    parse_query_parameters(context, path, strlen(path));
 
     context->region = bfromcstr(region);
     if (!context->region)
@@ -334,10 +335,10 @@ static void parse_path(aws_t context, const char *the_path, int len)
 {
     char *strpos, *path;
 
-    path = malloc(sizeof(char) * len);
+    path = malloc(sizeof(char) * len + 1);
     if (!path)
         return;
-    strncpy(path, the_path, len);
+    strncpy(path, the_path, len + 1);
 
     strpos = strstr(the_path, "?");
     if (strpos != NULL)
@@ -355,16 +356,15 @@ static void parse_path(aws_t context, const char *the_path, int len)
 static void parse_query_parameters(aws_t context, const char *the_path, int len)
 {
     char *path, *paramscope, *kvscope, *param;
-    int strpos;
     Pair kv;
 
-    path = malloc(sizeof(char) * len);
+    path = malloc(sizeof(char) * len + 1);
     if (!path)
         return;
-    strncpy(path, the_path, len);
+    strncpy(path, the_path, len + 1);
 
-    strtok_r(path, "?&", &paramscope);
-    while ((param = strtok_r(NULL, "?&", &paramscope))) {
+    strtok_r(path, "?", &paramscope);
+    while ((param = strtok_r(NULL, "&", &paramscope))) {
         kv.key = strtok_r(param, "=", &kvscope);
         kv.value = strtok_r(NULL, "=", &kvscope);
 
