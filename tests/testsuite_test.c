@@ -1,8 +1,9 @@
+#include <stdio.h>
+#include <dirent.h>
 #include "minunit.h"
 #include "aws_status.h"
 #include "aws_sigv4.h"
-#include <stdio.h>
-#include <dirent.h>
+#include "utils.h"
 
 #define LINE_LEN 256
 
@@ -13,11 +14,6 @@ struct file {
     char req_name[255];
     FILE *authz_file;
     FILE *req_file;
-};
-
-struct pair {
-    char *key;
-    char *val;
 };
 
 void cleanup_files(struct file *file);
@@ -37,17 +33,8 @@ char *test_aws_testsuite()
     char calculated_signature[65];
     char correct_signature[65];
     char *path;
-    char pathonly[255];
-    char *question_mark_pos;
     char *method;
-    char *param_str = NULL;
-    char *kv_pair = NULL;
-    char *kv_str;
-    char *kvtok_str;
-    char pair_tok[255];
-    struct pair kv;
-
-    char out[1024];
+    /* char out[1024]; */
 
     aws_t context;
 
@@ -63,9 +50,9 @@ char *test_aws_testsuite()
                 if (prepare_files(ep->d_name, &file) == AWS_ERR)
                     continue;
 
-                /* Set signature */
+                /* Get real signature */
                 fseek(file.authz_file, -64, SEEK_END);
-                size_t len = fread(correct_signature, 64, 1, file.authz_file);
+                fread(correct_signature, 64, 1, file.authz_file);
                 correct_signature[64] = '\0';
 
                 /* Get the first line from the request file */
@@ -81,37 +68,19 @@ char *test_aws_testsuite()
                 path = strtok(NULL, "\n");
                 path[strlen(path) - 10] = '\0';
 
-                // Cut path at the "?" if it has params
-                strcpy(pathonly, path);
-                question_mark_pos = strstr(path, "?");
-                if (question_mark_pos != NULL)
-                    pathonly[question_mark_pos-path] = '\0';
-
                 // DEBUG only test GET for now
                 if (strcmp(method, "GET") != 0) {
                     cleanup_files(&file);
                     continue;
                 }
 
-                context = aws_init("us-east-1", "host", "host.foo.com", pathonly, method);
-
-                param_str = strstr(path, "?");
-                if (param_str != NULL) {
-                    param_str++; /* Skip "?" */
-                    for (kv_pair = strtok_r(param_str, "&", &kv_str); kv_pair; kv_pair = strtok_r(NULL, "&", &kv_str)) {
-                        strcpy(pair_tok, kv_pair);
-                        kv.key = strtok_r(pair_tok, "=", &kvtok_str);
-                        kv.val = strtok_r(NULL, "\n", &kvtok_str);
-
-                        aws_add_param(context, kv.key, kv.val);
-                    }
-                }
+                context = aws_init("us-east-1", "host", "host.foo.com", path, method);
 
                 aws_sign(context, secret, date, calculated_signature);
 
                 // DEBUG
                 /* aws_debug(context, out); */
-                /* printf("%s %s\n%s vs\n%s\n\n", path, file.req_name, calculated_signature, correct_signature); */
+                /* printf("[%s] %s\n%s vs\n%s\n\n", path, file.req_name, calculated_signature, correct_signature); */
                 /* printf("-->\n%s\n<--\n", out); */
 
                 mu_assert(strcmp(calculated_signature, correct_signature) == 0, "Signatures don't match");
