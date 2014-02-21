@@ -29,6 +29,9 @@
 #include "uri.h"
 #include "utils.h"
 
+#define HTTP_METHOD_MAX_LENGTH 6 /* Safety checking the http method user input */
+#define HTTP_METHOD_COUNT 4
+
 static char *http_request_methods[4] = {"GET", "POST", "PUT", "DELETE"};
 
 struct request_date {
@@ -52,6 +55,7 @@ struct aws_context {
     bstring signature;
     aws_headers_t headers;
     aws_params_t params;
+    bstring form_data;
 };
 
 static bool initialized = false;
@@ -64,6 +68,8 @@ static int generate_string_to_sign(aws_t context);
 static int parse_date(aws_t context, const char *str);
 static void parse_path(aws_t context, const char *the_path, int len);
 static void parse_query_parameters(aws_t context, const char *the_path, int len);
+static bool is_valid_http_method(const char *method);
+static bool is_post_request(aws_t context);
 
 aws_t aws_init(const char *region, const char *service, const char *host, const char *path, const char *http_method)
 {
@@ -98,7 +104,9 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
     if (!context->path)
         return NULL;
 
-    /* TODO check if http_method is allowed */
+    if (!is_valid_http_method(http_method))
+        return NULL;
+
     context->request_method = bfromcstr(http_method);
     if (!context->request_method)
         return NULL;
@@ -113,6 +121,8 @@ aws_t aws_init(const char *region, const char *service, const char *host, const 
     context->string_to_sign = NULL;
     context->signature = NULL;
 
+    context->form_data = bfromcstr("");
+
     initialized = true;
 
     return context;
@@ -124,7 +134,9 @@ int aws_cleanup(aws_t context)
     assert(initialized);
 #endif
 
-    /* TODO need to check if null first? */
+    if (context == NULL)
+        return AWS_OK;
+
     bdestroy(context->account_id);
     bdestroy(context->region);
     bdestroy(context->service);
@@ -138,6 +150,7 @@ int aws_cleanup(aws_t context)
     bdestroy(context->date.original_str);
     bdestroy(context->date.str);
     bdestroy(context->date.str_date_only);
+    bdestroy(context->form_data);
 
     aws_headers_destroy(context->headers);
     aws_params_destroy(context->params);
@@ -168,6 +181,15 @@ int aws_add_param(aws_t context, const char *key, const char *value)
     return aws_params_add(context->params, key, value);
 }
 
+int aws_add_form_data(aws_t context, const char *form_data)
+{
+    if (is_post_request(context)) {
+        bcatcstr(context->form_data, form_data);
+    }
+
+    return AWS_OK;
+}
+
 static int generate_canonical_request(aws_t context)
 {
     bstring cr = bfromcstr("");
@@ -175,9 +197,8 @@ static int generate_canonical_request(aws_t context)
     bstring signed_headers = aws_headers_sign(context->headers);
     bstring canonical_query_string = aws_params_canonicalize(context->params);
 
-    /* TODO this is for request body. Using empty string for now. */
-    char hashed_payload[65];
-    sha256_hex(hashed_payload, "");
+    char hashed_form_data[65];
+    sha256_hex(hashed_form_data, (const char *)context->form_data->data);
 
     bconcat(cr, context->request_method);
     bcatcstr(cr, "\n");
@@ -189,7 +210,7 @@ static int generate_canonical_request(aws_t context)
     bcatcstr(cr, "\n");
     bconcat(cr, signed_headers);
     bcatcstr(cr, "\n");
-    bcatcstr(cr, (const char *)hashed_payload);
+    bcatcstr(cr, (const char *)hashed_form_data);
 
     bdestroy(signed_headers);
     bdestroy(canonical_headers);
@@ -372,4 +393,19 @@ static void parse_query_parameters(aws_t context, const char *the_path, int len)
     }
 
     free(path);
+}
+
+static bool is_valid_http_method(const char *method)
+{
+    int i;
+    for (i = 0; i < HTTP_METHOD_COUNT; i++)
+        if (strncmp(method, http_request_methods[i], HTTP_METHOD_MAX_LENGTH) == 0)
+            return true;
+
+    return false;
+}
+
+static bool is_post_request(aws_t context)
+{
+    return (bool)(strncmp((const char *)context->request_method->data, http_request_methods[1], HTTP_METHOD_MAX_LENGTH) == 0);
 }

@@ -94,6 +94,21 @@ char *test_example()
     return NULL;
 }
 
+char *test_add_bad_http_method()
+{
+    aws_cleanup(context);
+    context = aws_init("us-east-1", "host", "host.foo.com", "/", "GAT");
+
+    mu_assert(context == NULL, "Invalid http method should return a null context");
+
+    aws_cleanup(context);
+    context = aws_init("us-east-1", "host", "host.foo.com", "/", "");
+
+    mu_assert(context == NULL, "Empty http method should return a null context");
+
+    return NULL;
+}
+
 char *test_cleanup()
 {
     aws_cleanup(context);
@@ -111,6 +126,7 @@ char *all_tests() {
     mu_run_test(test_add_params);
     mu_run_test(test_sign);
     mu_run_test(test_example);
+    mu_run_test(test_add_bad_http_method);
     mu_run_test(test_cleanup);
 
     return NULL;

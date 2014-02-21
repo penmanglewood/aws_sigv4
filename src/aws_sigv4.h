@@ -64,6 +64,13 @@ int aws_add_param(aws_t context, const char *key, const char *value);
 int aws_sign(aws_t context, const char *secret, const char *date, char out[65]);
 
 /**
+ * Add the POST form data to the request
+ *
+ * @return AWS_ERR if failure, AWS_OK otherwise
+ */
+int aws_add_form_data(aws_t context, const char *form_data);
+
+/**
  * Generate debug string and swrite it to caller-supplied variable
  */
 void aws_debug(aws_t context, char *out);
